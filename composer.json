@@ -1,6 +1,5 @@
 {
     "name": "greenbean/validator",
-    "version": "0.0.1",
     "description": "Validates input and generates jQuery validation JSON rules.",
     "type": "project",
     "authors": [
@@ -9,7 +8,6 @@
             "email": "villascape@gmail.com"
         }
     ],
-    "minimum-stability": "dev",
     "require": {
         "php": ">=5.4.0"
     },
