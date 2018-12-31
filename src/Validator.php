@@ -96,6 +96,7 @@ class Validator implements ValidatorInterface
         'arrayMult'=>[],
         'arrayNum'=>[],
         'array'=>[],
+        //'object'=>new \stdClass(),
         //'bool'=>false,
         //'boolInt'=>0
     ];
@@ -113,6 +114,7 @@ class Validator implements ValidatorInterface
     public function __construct($json=false,$extra=[],$elements=[],$adj=[])
     {
         if($json) $this->initialize($json,$extra,$elements,$adj);
+        $this->sanitizeDefaults['object']=new \stdClass();
     }
 
     public function load($json,$extra=[],$elements=[],$adj=[])
@@ -690,6 +692,19 @@ RE;
         return (in_array($value, $prop))?false:$name.' must be one of: '.implode(', ',$prop);
     }
 
+    protected function isObject($value,$prop,$name)
+    {
+        return (!$prop || is_object($value))?false:$name.' is not an object';
+    }
+    protected function isArray($value,$prop,$name)
+    {
+        return (!$prop || is_array($value))?false:$name.' is not an array';
+    }
+    protected function isSequntialArray($value,$prop,$name)
+    {
+        return (!$prop || (is_array($value) && array_values($value) === $value))?false:$name.' is not a sequential array';
+    }
+
     // Used for client side only validation
     protected function noServer($value,$prop,$name)
     {
@@ -741,6 +756,10 @@ RE;
     protected function array($value,$prop)
     {
         return $prop?(array)$value:$value;
+    }
+    protected function object($value,$prop)
+    {
+        return $prop?(object)$value:$value;
     }
     protected function arrayInt($value,$prop)
     {
