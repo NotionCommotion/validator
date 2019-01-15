@@ -19,7 +19,7 @@
 
 namespace Greenbean\Validator;
 
-interface ValidatorInterface
+interface CustomRuleInterface
 {
     public function addObj($o);
     public function addRules($o);
