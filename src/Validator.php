@@ -35,6 +35,42 @@
 *
 * Sanitizers are described in a simalar format, and are used server-side only.  Similar to rules, they can be defined as simple or complex.
 * Standard supported sanitizers are specified under $this->sanitizers.
+*
+* Example:
+*
+{
+    "someProperty": {
+
+        "rule": "singleRule",
+        //Or
+        "rule": [
+            "singleRule",
+            {"anotherRuleWith": "anotherParameter"}
+        ],
+        //Or
+        "rule": {
+            "singleRule": true,
+            "ruleWith": "parameter",
+            "inArray": ["csv","highchart","json"],
+            "require_from_group": [1, "{name=name1}, {name=name2}"],
+            "ruleWithObject (not yet supported)": {"propName": "propValue"}
+        },
+
+        "sanitize": "singleSanitizer",
+        //Or
+        "sanitize": {"max": 5},
+        //Or
+        "sanitize": ["array", "of", "sanitizers", {"max": 5}],
+
+        "default": "singleOptionalValue",
+
+        "message": "singleOptionalMessage"
+
+    },
+
+    "anotherProperty": {}
+}
+*
 */
 
 namespace Greenbean\Validator;
@@ -65,22 +101,24 @@ class Validator
     $debugValidators, $debugSanitizers; //Internally used
 
     /**
-    * Receives rules/message/sanitizer JSON string.
+    * Receives rules/message/sanitizer in an array.
     * $exceptionPath is the exception that will be thrown
     * $rules and $sanitizers are both an associated array with closure as their values and will be added to the default rules and sanitizers
     */
-    public function __construct(string $json, string $exceptionPath=null, array $customRules=[], array $customSanitizers=[], array $config=[]) {
-        if($errors=array_diff_key($config, array_keys($this->config))) $errors=['Invalid config properties: '.implode(', ', $err)];
+    public function __construct(array $options=[], string $exceptionPath=null, array $customRules=[], array $customSanitizers=[], array $config=[]) {
+        if($errors=array_diff_key($config, array_keys($this->config))) {
+            $errors=['Invalid config properties: '.implode(', ', $err)];
+        }
         $this->config=array_merge($this->config, $config);
-        if(!$options=json_decode($json, true))$errors[]='Invalid JSON: '.$this->json_error();
         $this->options=array_merge(['rules'=>[],'sanitizers'=>[]],$options);
+
         //Can use ReflectionFunction to test number of arguements and maybe returned type, but I currently don't bother
         $used=[];
         foreach($customRules as $name=>$closure) {
             if(is_numeric($name)) $errors[]='All custom rules must have non-numerical strings as their name';
-            elseif($name='function') $errors[]='Custom rules may not use the name "function"';
+            elseif($name==='function') $errors[]='Custom rules may not use the name "function"';
             elseif(isset($used[$name])) $errors[]="Custom rules '$name' has already been defined";
-            if(!is_object($closure) || !($t instanceof \Closure))  $errors[]='All custom rules must be closure';
+            if(!is_object($closure) || !($closure instanceof \Closure))  $errors[]='All custom rules must be closure';
             $used[$name]=null;
         }
         $used=[];
@@ -106,19 +144,19 @@ class Validator
     }
 
     public function validateProperty(string $name, $value, bool $suppressExceptions=null):?string {
-        return $this->validate([$name=>$value], $suppressExceptions);
+        return $this->validate([$name=>$value], [$name], $suppressExceptions);
     }
 
-    public function sanitizeProperty(string $name, $value, bool $setUndefinedValues = null):?string {
-        return $this->sanitize([$name=>$value], $setUndefinedValues)[$name];
+    public function sanitizeProperty(string $name, $value) {
+        return $this->sanitize([$name=>$value], [$name])[$name]??null;
     }
 
-    public function validate(array $data, bool $suppressExceptions=null):?array {
+    public function validate(array $data, array $limit=[], bool $suppressExceptions=null):?array {
         $debug=[];
         $this->params=$data; //Used for require_from_group
         $errors=[];
-
-        foreach($this->options['rules'] AS $name=>$rule) {
+        $rules=$limit?array_intersect_key($this->options['rules'], array_flip($limit)):$this->options['rules'];
+        foreach($rules AS $name=>$rule) {
             if(is_array($rule)) {
                 // compound rule
                 foreach ($rule AS $method=>$option) {
@@ -132,7 +170,7 @@ class Validator
             }
             else {
                 // simple rule, converted to {theRule:true}
-                $this->_validate($errors, $method, $name, $data[$name]??null, true);
+                $this->_validate($errors, $rule, $name, $data[$name]??null, true);
             }
 
         }
@@ -144,7 +182,7 @@ class Validator
                 foreach($errors as $name=>&$error) {
                     $error="$name ".implode(', ',$error);
                 }
-                throw new $this->exceptionPath(implode(' | ',$e));
+                throw new $this->exceptionPath(implode(' | ',$errors));
             }
             foreach($errors as &$error) {
                 $error=implode(', ',$error);
@@ -153,11 +191,12 @@ class Validator
         return $errors?$errors:null;
     }
 
-    public function sanitize(array $data, bool $setUndefinedValues = null):array {
+    public function sanitize(array $data, array $limit=[], bool $setUndefinedValues = null):array {
         $this->debugSanitizers=[];
         if(empty($this->options['sanitizers'])) return $data;
         $sanitized=[];
-        foreach ($this->options['sanitizers'] AS $name=>$sanitizer) {
+        $sanitizers=$limit?array_intersect_key($this->options['sanitizers'], array_flip($limit)):$this->options['sanitizers'];
+        foreach ($sanitizers AS $name=>$sanitizer) {
             syslog(LOG_ERR, "name: $name");
             if(isset($data[$name])) {
                 if(is_array($sanitizer)) {
@@ -221,7 +260,7 @@ class Validator
             //$.validate standard rules
 
             "required"=>function($value, $prop, $name){
-                return (!$prop || (!is_null($value) && trim($value)!=''))?false:"$name is required";
+                return ($prop && (is_null($value) || (is_string($value) && trim($value)==='')))?"$name is required":false;
             },
             "remote"=>function($value, $prop, $name){
                 //Validated via separate call.
@@ -231,7 +270,7 @@ class Validator
                 return ( ($str=trim($value)) && strlen($str)<$length)?"$name requires $length characters":false;
             },
             "maxlength"=>function($value, int $length, $name){
-                return (strlen(trim($value))>$length)?'$name allows no more than $length characters':false;
+                return (strlen(trim($value))>$length)?"$name allows no more than $length characters":false;
             },
             "rangelength"=>function($value, array $rangelength, $name){
                 if(!isset($rangelength[0]) || !isset($rangelength[1])) throw new ValidatorException('rangelength must be a two dimentional array');
@@ -239,10 +278,10 @@ class Validator
                 return $value>=$r[0] && $value<=$r[1]?false:"$name must be between $r[0] and $r[1]";
             },
             "min"=>function($value, $min, $name){
-                return ($value && $value<$min)?'$name must be greater or equal to $min':false;
+                return ($value && $value<$min)?"$name must be greater or equal to $min":false;
             },
             "max"=>function($value, $max, $name){
-                return ($value && $value>$max)?'$name must be less than or equal to $max':false;
+                return ($value && $value>$max)?"$name must be less than or equal to $max":false;
             },
             "range"=>function($value, array $range, $name){
                 if(!isset($range[0]) || !isset($range[1])) throw new ValidatorException('range must be a two dimentional array');
@@ -273,10 +312,10 @@ class Validator
                 ?false:$name.' is not a ISO date';
             },
             "number"=>function($value, $prop, $name){
-                return (!$prop || !trim($value) || is_numeric($value))?false:'$name is not a number';
+                return (!$prop || !trim($value) || is_numeric($value))?false:"$name is not a number";
             },
             "digits"=>function($value, $prop, $name){
-                return (!$prop || !trim($value) || ctype_digit($value) || $value===(int)$value)?false:'$name is not a digit';
+                return (!$prop || !trim($value) || ctype_digit($value) || $value===(int)$value)?false:"$name is not a digit";
             },
 
             "equalTo"=>function($value, $value2, $name){
@@ -324,10 +363,13 @@ class Validator
             //Custom rules
 
             "string"=>function($value, $prop, $name){
-                return (!$prop || !trim($value) || is_string($value))?false:'$name is not a string';
+                return (!$prop || !trim($value) || is_string($value))?false:"$name is not a string";
+            },
+            "bool"=>function($value, $prop, $name){
+                return (!$prop || is_bool($value))?false:"$name is not boolean";
             },
             "exactlength"=>function($value, $prop, $name){
-                return (strlen(trim($value))!=$prop)?'$name requires exactly $prop characters':false;
+                return (strlen(trim($value))!=$prop)?"$name requires exactly $prop characters":false;
             },
             "longitude"=>function($value, $prop, $name){
                 return (!$prop || !trim($value) || ($value<=180))?false:'Invalid longitude';
@@ -378,16 +420,16 @@ class Validator
                 return ($valid)?false:'IP Addresses must have format xxx.xxx.xxx.xxx';
             },
             "inArray"=>function($value, $prop, $name){
-                return (in_array($value, $prop))?false:$name.' must be one of: '.implode(', ',$prop);
+                return (in_array($value, $prop))?false:"$name must be one of: ".implode(', ',$prop);
             },
             "isObject"=>function($value, $prop, $name){
-                return (!$prop || is_object($value))?false:$name.' is not an object';
+                return (!$prop || is_object($value))?false:"$name is not an object";
             },
             "isArray"=>function($value, $prop, $name){
-                return (!$prop || is_array($value))?false:$name.' is not an array';
+                return (!$prop || is_array($value))?false:"$name is not an array";
             },
             "isSequntialArray"=>function($value, $prop, $name){
-                return (!$prop || (is_array($value) && array_values($value) === $value))?false:$name.' is not a sequential array';
+                return (!$prop || (is_array($value) && array_values($value) === $value))?false:"$name is not a sequential array";
             },
             "noServer"=>function($value, $prop, $name){
                 // Used for client side only validation
@@ -416,7 +458,7 @@ class Validator
             "int"=>function($value){
                 return (int)$value;
             },
-            "boolval"=>function($value){
+            "bool"=>function($value){
                 return boolval($value);
             },
             "boolInt"=>function($value){
