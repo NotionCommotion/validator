@@ -19,20 +19,16 @@
 
 namespace Greenbean\Validator;
 
-interface CustomRuleInterface
+interface ValidatorConfigInterface
 {
-    public function addObj($o);
-    public function addRules($o);
-    public function addMessages($o);
-    public function addSanitizers($o);
-    public function removeRule($prop);
-    public function removeMessage($prop);
-    public function removeSanitize($prop);
-    public function getJSON($makeJSON=false);
-    public function validateRemote();
-    public function validate(array $d, array $limit=[]);
-    public function validateOnly(array $d, array $limit=[]);
-    public function sanitize(array $d);
-    public function nameValueisValid($name, $data);
-    public function load($json,$extra=[],$elements=[],$adj=[]);
+    //Return a list of supported rules.
+    public function getRules():array;
+    //Return a list of supported sanitizers.
+    public function getSanitizers():array;
+    //Return the error message or NULL for no errors
+    public function validate(string $method, $value, string $prop, string $name):?string;
+    //Sanitize the data
+    public function sanitize(string $method, $value, string $prop);
+    //Process error (or throw an exception if desired)  $error will be ['property'=>['errors message', ...]...]
+    public function processError(array $error): string;
 }
