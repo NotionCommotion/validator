@@ -26,9 +26,9 @@ interface ValidatorConfigInterface
     //Return a list of supported sanitizers.
     public function getSanitizers():array;
     //Return the error message or NULL for no errors
-    public function validate(string $method, $value, string $prop, string $name):?string;
+    public function validate(string $method, $value, string $prop, string $name, array $data):?string;
     //Sanitize the data
     public function sanitize(string $method, $value, string $prop);
     //Process error (or throw an exception if desired)  $error will be ['property'=>['errors message', ...]...]
-    public function processError(array $error): string;
+    //public function processError(array $error): string;
 }

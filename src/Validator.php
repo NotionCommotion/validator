@@ -33,6 +33,17 @@ namespace Greenbean\Validator;
 * Sanitizers are described in a simalar format, and are used server-side only.  Similar to rules, they can be defined as simple or complex.
 * Standard supported sanitizers are specified under $this->sanitizers.
 *
+* Unlike jQuery.Validator, config JSON first specifies each property name and then lists the following:
+* - rules.  Follows jQuery.Validator format.
+* - messages.  Follows jQuery.Validator format.
+* - sanitizers.  Similar to jQuery.Validator format, but can also be a sequencial array.  These are only used by the sanitize methods.
+* - default.  An value or array.  Will replace if NULL is provided.
+* - extend.  This is used to validate deep JSON.
+* When encountered, it is interpreted as a sub-object or array of sub-objects if defined as [{"name":{...}}]
+* Standard rules, etc apply to the extended object.
+* As sub-objects do not pertain to jQuery.Validator, these are not returned for its use,
+* however, it is possible to extract a subproperty and use that.
+*
 * Example:
 * {
 * "someProperty": {
@@ -78,7 +89,6 @@ namespace Greenbean\Validator;
 * " anotherProperty ": {}
 * }
 *
-* Extend description...
 *
 * Copyright Michael Reed, 2013
 * Dual licensed under the MIT and GPL licenses.
@@ -100,26 +110,10 @@ class Validator
     $customSanitizers=[],           //Internal.  array of custom sanitizers supported by ValidatorConfig
     $rules, $sanitizers;            //Internal.  standard rules and sanitizers
 
-    public function __construct(array $properties, ValidatorConfig $validatorConfig=null, bool $throwExeptions=true) {
+    public function __construct(array $properties, ValidatorConfigInterface $validatorConfig=null, bool $throwExeptions=true) {
 
-        if(empty($properties)) {
-            throw new ValidatorErrorException('Config properties is empty');
-        }
-        if($this->isSequentialArray($properties)) {
-            if(!in_array(count($properties),[1,2])) {
-                throw new ValidatorErrorException('Sequencial array validation must have only one value plus an optional required flag');
-            }
-            $this->properties=$properties[0];
-            $this->sequencialArray=true;
-            $this->minimumArrayCount=$properties[1]??null;
-            $this->maximumArrayCount=$properties[2]??null;
-        }
-        elseif(!$this->isAssocArray($properties)) {
-            throw new ValidatorErrorException('First arguement must only have strings as keys');
-        }
-        else {
-            $this->properties=$properties;
-        }
+        $this->setProperties($properties);
+
         if($validatorConfig) {
             $this->validatorConfig=$validatorConfig;
             $this->customRules=$validatorConfig->getRules();
@@ -131,7 +125,7 @@ class Validator
         $this->sanitizers=new Sanitizers();
     }
 
-    static public function create(array $properties, ValidatorConfig $validatorConfig=null, bool $throwExeptions=true) {
+    static public function create(array $properties, ValidatorConfigInterface $validatorConfig=null, bool $throwExeptions=true) {
         return new self($properties, $validatorConfig, $throwExeptions);
     }
 
@@ -140,20 +134,62 @@ class Validator
         $options=[];
         foreach($files as $file) {
             if(!$arr=json_decode(file_get_contents($file), true)) {
-                throw new \Exception ('Invalid JSON used for validation rules');
+                throw new ValidatorErrorException ('Invalid JSON used for validation rules');
             }
             $options[]=$arr;
         }
         return count($options)>1?array_replace_recursive(...$options):$options[0];
     }
 
-    public function getJSON(bool $asJson=false) {
-        //Future.  Go through rules and make into JavaScript those that have the name "function"
-        //Future.  insert values in the JSON using $this->parse($json, $parse);
+    public function getSubProperties(string $subpath, array $properties=[]) {
+        $properties=$properties?array_replace_recursive($this->properties, $properties):$this->properties;
+        $subpath=explode('.', $subpath);
+        foreach($subpath as $key) {
+            if(!isset($properties[$key])) {
+                throw new ValidatorErrorException ('Undefined getSubProperties(path): '.implode('.', $subpath));
+            }
+            $properties=$key==='0'?$properties[$key]:$properties[$key]['extend'];
+        }
+        return $properties;    //Let caller deal with it should an array be returned.
+    }
+
+    private function setProperties(array $properties) {
+        if($properties && $this->isSequentialArray($properties)) {
+            if(!in_array(count($properties),[1,2,3])) {
+                throw new ValidatorErrorException('Sequencial array validation must have only one value plus an optional minimum and maximum count value');
+            }
+            $this->properties=$properties[0];
+            $this->sequencialArray=true;
+            $this->minimumArrayCount=$properties[1]??null;
+            $this->maximumArrayCount=$properties[2]??null;
+        }
+        else {
+            $this->properties=$properties;
+        }
+    }
+
+    public function replaceProperties(array $properties) {
+        $this->setProperties($properties);
+    }
+
+    public function getJSON(array $properties=[], string $subpath=null, bool $asJson=false) {
+        /**
+        * Returns JSON to be used by jQuery.Validator.
+        *
+        * Does not support extended options.
+        * Future.  Go through rules and make into JavaScript those that have the name "function"
+        * Future.  insert values in the JSON using $this->parse($json, $parse);
+        *
+        * @param array $properties Added to existing properties
+        * @param string $subpath If specified, returns a sub-object in the base properties
+        * @param bool $asJson Whether to return as string or array.
+        */
         $rules=[];
         $messages=[];
+        $properties=$subpath?$this->getSubProperties($subpath, $properties)
+        :($properties?array_replace_recursive($this->properties, $properties):$this->properties);
 
-        foreach($this->properties as $name=>$options) {
+        foreach($properties as $name=>$options) {
             if(isset($options['rules']) && !(isset($options['rules'][0]) && $options['rules'][0]==='serverOnly')) {
                 $rules[$name]=$options['rules'];
             }
@@ -161,19 +197,22 @@ class Validator
                 $messages[$name]=$options['message'];
             }
         }
-        return $asJson?json_encode(['rules'=>$rules, 'messages'=>$messages]):['rules'=>$rules, 'messages'=>$messages];
+        $rsp=[];
+        if($rules) $rsp['rules']=$rules;
+        if($messages) $rsp['messages']=$messages;
+        return $asJson?json_encode($rsp):$rsp;
     }
 
-    public function validateProperty(string $name, $value):?string {
-        return $this->validate([$name=>$value], [$name]);
+    public function validateProperty(string $name, $value, string $path=null):?string {
+        return $this->validate([$name=>$value], $path, [$name]);
     }
 
-    public function sanitizeProperty(string $name, $value) {
-        return $this->sanitize([$name=>$value], [$name])[$name]??null;
+    public function sanitizeProperty(string $name, $value, string $path=null) {
+        return $this->sanitize([$name=>$value], $path, [$name])[$name]??null;
     }
 
-    public function validate(array $data, array $limit=[]):array {
-        $properties=$limit?array_intersect_key($this->properties, array_flip($limit)):$this->properties;
+    public function validate(array $data, string $path=null, array $limit=[]):array {
+        $properties=$this->getProperties($path, $limit);
         $errors=[];
 
         if($this->sequencialArray) {
@@ -202,8 +241,8 @@ class Validator
         return $errors;
     }
 
-    public function sanitize(array $data, array $limit=[]):array {
-        $properties=$limit?array_intersect_key($this->properties, array_flip($limit)):$this->properties;
+    public function sanitize(array $data, string $path=null, array $limit=[]):array {
+        $properties=$this->getProperties($path, $limit);
 
         if($this->sequencialArray) {
             if(is_array($data)) {
@@ -221,10 +260,18 @@ class Validator
         return $data;
     }
 
+    private function getProperties(?string $path, array $limit) {
+        $properties=$path?$this->getSubProperties($this->properties, $path):$this->properties;
+        if($limit) {
+            $properties=array_intersect_key($properties, array_flip($limit));
+        }
+        return $properties;
+    }
+
     private function validateRow(array &$errors, array $properties, array $data):void {
         foreach($properties as $name=>$item) {
+            $value=$data[$name]??$item['default']??null;
             if(!empty($item['rules'])) {
-                $value=$data[$name]??$item['default']??null;
                 if(is_string($item['rules'])) {
                     $this->validateValue($errors, $item['rules'], $name, $value, true, $data);
                 }
@@ -253,9 +300,10 @@ class Validator
             }
             if(!empty($item['extend'])) {
                 if(!$item['extend'] instanceof Validator) {
-                    $item['extend']=new self($item['extend'], $this->customRules, $this->customSanitizers, false);
+                    $item['extend']=new self($item['extend'], $this->validatorConfig, false);
                 }
-                foreach($item['extend']->validate($value) as $err) {
+                $errs=$item['extend']->validate($value);
+                foreach($errs as $err) {
                     $errors[]="$name $err";
                 }
             }
@@ -286,18 +334,21 @@ class Validator
                     }
                 }
             }
+            if(!empty($item['default']) && !isset($data[$name])) {
+                $data[$name]=$item['default'];
+            }
             if(!empty($item['extend'])) {
                 if(!$item['extend'] instanceof Validator) {
-                    $item['extend']=new self($item['extend'], $this->customRules, $this->customSanitizers, false);
+                    $item['extend']=new self($item['extend'], $this->validatorConfig, false);
                 }
-                $sanitized[$name]=$item['extend']->sanitize($sanitized[$name]);
+                $sanitized[$name]=$item['extend']->sanitize($sanitized[$name]??[]);
             }
         }
         return $sanitized;
     }
 
     private function validateValue(array &$errors, string $method, string $name, $value, $prop, array $data):void {
-        if(isset($this->customRules[$method])) {
+        if(in_array($method, $this->customRules)) {
             if($error=$this->validatorConfig->validate($method, $value, $prop, $name, $data)) {
                 $errors[]=$error;
             }
@@ -313,7 +364,9 @@ class Validator
     }
 
     private function sanitizeValue(string $method, $name, $value, $prop) {
-        if(isset($this->customSanitizers[$method])) {
+        //if(is_null($value)) return null;
+        if(in_array($method, $this->customSanitizers)) {
+            //if(isset($this->customSanitizers[$method])) {
             return $this->validatorConfig->sanitize($method, $value, $prop);
         }
         if(method_exists($this->sanitizers, $method)) {

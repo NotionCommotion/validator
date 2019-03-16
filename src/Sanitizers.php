@@ -1,6 +1,6 @@
 <?php
 namespace Greenbean\Validator;
-class Sanitizers implements ValidatorSanitizersInterface {
+class Sanitizers {
 
     //All sanitized will be passed $value plus one optional property, and return the sanitized property
 
@@ -8,12 +8,15 @@ class Sanitizers implements ValidatorSanitizersInterface {
         return $value;
     }
     public function strtolower($value){
+        $this->verifyAString($value);
         return strtolower($value);
     }
     public function strtoupper($value){
+        $this->verifyAString($value);
         return strtoupper($value);
     }
     public function trim($value){
+        $this->verifyAString($value);
         return trim($value);
     }
     public function string($value){
@@ -45,6 +48,7 @@ class Sanitizers implements ValidatorSanitizersInterface {
         return (object)$value;
     }
     public function arrayInt($value){
+        $this->verifyAnArray($value);
         foreach($value as &$val){
             $val=(int)$val;
         }
@@ -52,6 +56,7 @@ class Sanitizers implements ValidatorSanitizersInterface {
     }
     public function arrayMult($value, $prop=null){
         //Future. Add similar validatin for arrayMult
+        $this->verifyAnArray($value);
         if(!$prop) throw new ValidatorException('arrayMulti sanitizer requires an array definition.  i.e. "id|sign"');
         $indexes=array_flip(explode('|',$prop));
         foreach($value as &$val){
@@ -60,12 +65,14 @@ class Sanitizers implements ValidatorSanitizersInterface {
         return $value;
     }
     public function arrayNum($value){
+        $this->verifyAnArray($value);
         foreach($value as &$val){
             $val=is_numeric($val)?$val:null;
         }
         return $value;
     }
     public function trimNull($value){
+        $this->verifyAString($value);
         return ($val=trim($value))?$val:null;
     }
     public function setNull($value){
@@ -73,6 +80,7 @@ class Sanitizers implements ValidatorSanitizersInterface {
         return null;
     }
     public function removePeriods($value){
+        $this->verifyAString($value);
         return ($val=str_replace('.','',$value))?$val:null;
     }
     public function numbersOnly($value){
@@ -80,6 +88,7 @@ class Sanitizers implements ValidatorSanitizersInterface {
         //return (($valuex=preg_replace("/\D/","",$value))?$valuex:null);
     }
     public function USstate($value){
+        $this->verifyAString($value);
         $value = strtoupper(preg_replace('/[^a-z]+/i', '', trim($value)));
         if(strlen($value)!=2) {
             $states=['ALABAMA'=>'AL','ALASKA'=>'AK','AMERICAN SAMOA'=>'AS','ARIZONA'=>'AZ','ARKANSAS'=>'AR','CALIFORNIA'=>'CA','COLORADO'=>'CO','CONNECTICUT'=>'CT','DELAWARE'=>'DE','DISTRICT OF COLUMBIA'=>'DC','FEDERATED STATES OF MICRONESIA'=>'FM','FLORIDA'=>'FL','GEORGIA'=>'GA','GUAM'=>'GU','HAWAII'=>'HI','IDAHO'=>'ID','ILLINOIS'=>'IL','INDIANA'=>'IN','IOWA'=>'IA','KANSAS'=>'KS','KENTUCKY'=>'KY','LOUISIANA'=>'LA','MAINE'=>'ME','MARSHALL ISLANDS'=>'MH','MARYLAND'=>'MD','MASSACHUSETTS'=>'MA','MICHIGAN'=>'MI','MINNESOTA'=>'MN','MISSISSIPPI'=>'MS','MISSOURI'=>'MO','MONTANA'=>'MT','NEBRASKA'=>'NE','NEVADA'=>'NV','NEW HAMPSHIRE'=>'NH','NEW JERSEY'=>'NJ','NEW MEXICO'=>'NM','NEW YORK'=>'NY','NORTH CAROLINA'=>'NC','NORTH DAKOTA'=>'ND','NORTHERN MARIANA ISLANDS'=>'MP','OHIO'=>'OH','OKLAHOMA'=>'OK','OREGON'=>'OR','PALAU'=>'PW','PENNSYLVANIA'=>'PA','PUERTO RICO'=>'PR','RHODE ISLAND'=>'RI','SOUTH CAROLINA'=>'SC','SOUTH DAKOTA'=>'SD','TENNESSEE'=>'TN','TEXAS'=>'TX','UTAH'=>'UT','VERMONT'=>'VT','VIRGIN ISLANDS'=>'VI','VIRGINIA'=>'VA','WASHINGTON'=>'WA','WEST VIRGINIA'=>'WV','WISCONSIN'=>'WI','WYOMING'=>'WY'];
@@ -89,6 +98,7 @@ class Sanitizers implements ValidatorSanitizersInterface {
         return $value;
     }
     public function url($value){
+        $this->verifyAString($value);
         $value=trim($value);
         if($value) {
             return (strtolower(substr($value,0,7))=='http://' || strtolower(substr($value,0,8))=='https://')?$value:'http://'.$value;
@@ -96,9 +106,11 @@ class Sanitizers implements ValidatorSanitizersInterface {
         else return null;
     }
     public function phoneNull($value){
+        $this->verifyAString($value);
         return ($val=preg_replace("/\D/","",$value))?$val:null;
     }
     public function dollars($value){
+        $this->verifyAString($value);
         $value=$value?number_format(ltrim($value,'$'),2,'.',''):null;
         return is_numeric($value)?$value:null;
     }
@@ -120,27 +132,34 @@ class Sanitizers implements ValidatorSanitizersInterface {
         return max($value, $max);
     }
     public function phone($value){
+        $this->verifyAString($value);
         $value=preg_replace("/\D/","",$value);  //Numbers only
         return (substr($value, 0, 1)==1)?substr( $value, 1 ):$value;  //Remove first charactor if 1
     }
     public function dateUnix($value){
+        $this->verifyAString($value);
         return $value?(new \DateTime($value))->setTime(0,0)->getTimestamp():null;
     }
     public function dateTimeUnix($value){
+        $this->verifyAString($value);
         return $value?(new \DateTime($value))->getTimestamp():null;
     }
     public function dateStandard($value){
+        $this->verifyAString($value);
         return $value?(new \DateTime($value))->setTime(0,0)->format('Y-m-d'):null;
     }
     public function dateStandard_w_time($value){
+        $this->verifyAString($value);
         $hide_time=false;
         $datetime = new \DateTime($value);
         return ($hide_time && $datetime->format( 'H')==0 && $datetime->format( 'i')==0 && $datetime->format( 's')==0)?$datetime->format('Y-m-d'):$datetime->format('Y-m-d H:i:s');
     }
     public function dateUS($value){
+        $this->verifyAString($value);
         return $value?(new \DateTime($value))->setTime(0,0)->format('m/d/Y'):null;
     }
     public function dateUS_w_time($value){
+        $this->verifyAString($value);
         if($value) {
             $datetime = new \DateTime($value);
             return ($datetime->format( 'H')==0 && $datetime->format( 'i')==0)?$datetime->format('m/d/Y'):$datetime->format('m/d/Y H:i');
@@ -169,5 +188,21 @@ class Sanitizers implements ValidatorSanitizersInterface {
     public function arrayDeliminated($value, $deliminator){
         //Given string such as a,b,c returns [a,b,c]
         return $value ? explode($deliminator, $value) : [];
+    }
+
+    private function verifyNotAnArray($value){
+        if(is_array($value)) {
+            throw new ValidatorException('A string or number was expected but an array was received.');
+        }
+    }
+    private function verifyAnArray($value){
+        if(!is_array($value)) {
+            throw new ValidatorException('An array was expected but a '.gettype($value).' was provided');
+        }
+    }
+    private function verifyAString($value){
+        if(!is_string($value)) {
+            throw new ValidatorException('An string was expected but a '.gettype($value).' was provided');
+        }
     }
 }
