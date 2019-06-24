@@ -36,6 +36,11 @@ class Rules {
         if(!is_numeric($range[0]) || !is_numeric($range[1])) throw new ValidatorException('range must contain numbers');
         return strlen($value)>=$r[0] && strlen($value)<=$r[1]?false:"{$name}'s length must be between $r[0] and $r[1] characters";
     }
+    public function array_range($value, array $range, $name){
+        if(!isset($range[0]) || !isset($range[1])) throw new ValidatorException('range must be a two dimentional array');
+        if(!is_numeric($range[0]) || !is_numeric($range[1])) throw new ValidatorException('range must contain numbers');
+        return count($value)>=$r[0] && count($value)<=$r[1]?false:"{$name}'s array length must be between $r[0] and $r[1] characters";
+    }
     public function step($value, $step, $name){
         return $value % $step?"$name is not a step of $step":false;
     }
@@ -168,7 +173,7 @@ class Rules {
         return ($valid)?false:'IP Addresses must have format xxx.xxx.xxx.xxx';
     }
     public function inArray($value, $prop, $name){
-        return (in_array($value, $prop))?false:"$name must be one of: ".implode(', ',$prop);
+        return (!$value || in_array($value, $prop))?false:"$name must be one of: ".implode(', ',$prop);
     }
     public function isObject($value, $prop, $name){
         return (!$prop || is_object($value))?false:"$name is not an object";

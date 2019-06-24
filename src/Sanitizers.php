@@ -72,7 +72,8 @@ class Sanitizers {
         return $value;
     }
     public function trimNull($value){
-        $this->verifyAString($value);
+        //$this->verifyAString($value);
+        $value=(string)$value;
         return ($val=trim($value))?$val:null;
     }
     public function setNull($value){
