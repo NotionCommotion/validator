@@ -243,12 +243,12 @@ class Validator
         return $this->validate([$params['name'] => $params['value']], $path, [$params['name']]);
     }
 
-    public function sanitizeProperty(string $name, $value, string $path=null) {
-        return $this->sanitize([$name=>$value], $path, [$name])[$name]??null;
+    public function sanitizeProperty(string $name, $value, string $path=null, $default=null) {
+        return $this->sanitize([$name=>$value], $path, [$name])[$name]??$default;
     }
 
-    public function sanitizeProperties(array $data, string $path=null):array {
-        return $this->sanitize($data, null, array_keys($data));
+    public function sanitizeProperties(array $data, string $path=null, array $default=[]):array {
+        return $this->sanitize($data, $path, array_keys($data), $default);
     }
 
     public function validate(array $data, string $path=null, array $limit=[]):array {
@@ -281,13 +281,13 @@ class Validator
         return $errors;
     }
 
-    public function sanitize(array $data, string $path=null, array $limit=[]):array {
+    public function sanitize(array $data, string $path=null, array $limit=[], array $default=[]):array {
         $properties=$this->getProperties($path, $limit);
 
         if($this->sequencialArray) {
             if(is_array($data)) {
                 foreach($data as &$row) {
-                    $row=$this->sanitizeRow($properties, $row);
+                    $row=$this->sanitizeRow($properties, $row, $default);
                 }
             }
             else {
@@ -295,7 +295,7 @@ class Validator
             }
         }
         else {
-            $data=$this->sanitizeRow($properties, $data);
+            $data=$this->sanitizeRow($properties, $data, $default);
         }
         return $data;
     }
@@ -350,12 +350,12 @@ class Validator
             }
         }
     }
-    private function sanitizeRow(array $properties, array $data):array {
+    private function sanitizeRow(array $properties, array $data, array $default):array {
         $sanitized=[];
         foreach($properties as $name=>$item) {
-            if(!empty($item['sanitizers']) || !empty($item['default'])) {
+            if(isset($item['sanitizers']) || isset($default['default']) || isset($item['default'])) {
                 //Don't include parameters that do not have a sanitizer or default.
-                $sanitized[$name]=$data[$name]??$item['default']??null;
+                $sanitized[$name]=$data[$name]??$default[$name]??$item['default']??null;
                 if(is_string($item['sanitizers'])) {
                     $sanitized[$name]=$this->sanitizeValue($item['sanitizers'], $name, $sanitized[$name], null);
                 }
