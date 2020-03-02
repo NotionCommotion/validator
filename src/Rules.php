@@ -121,8 +121,14 @@ class Rules {
     public function bool($value, $prop, $name){
         return (!$prop || is_bool($value))?false:"$name is not boolean";
     }
+    public function boolInt($value, $prop, $name){
+        return (!$prop || is_bool($value) || $value===0 || $value===1)?false:"$name is not boolean";
+    }
     public function exactlength($value, $prop, $name){
         return (strlen(trim($value))!=$prop)?"$name requires exactly $prop characters":false;
+    }
+    public function guid($value, $prop, $name){
+        return (!$prop || !trim($value) || preg_match("/^(\{)?[a-f\d]{8}(-[a-f\d]{4}){4}[a-f\d]{8}(?(1)\})$/",$value))?false:'Invalid GUID format';
     }
     public function longitude($value, $prop, $name){
         return (!$prop || !trim($value) || ($value<=180))?false:'Invalid longitude';
@@ -134,7 +140,7 @@ class Rules {
         return (!$prop || !trim($value) || preg_match("/^[a-z0-9._]+$/i",$value))?false:'Username must contain only letters, numbers, underscore, or period';
     }
     public function noInvalid($value, $prop, $name){
-        return (!$prop || !trim($value) || preg_match("/^[a-z0-9.,-_()& ]+$/i",$value))?false:'Invalid characters';
+        return (!$prop || !trim($value) || preg_match("/^[a-z0-9.,-_!()& ]+$/i",$value))?false:'Invalid characters';
     }
     public function domain($value, $prop, $name){
         return (!$prop || !trim($value) || preg_match("/^[a-z0-9_-]+$/i",$value))?false:'Alphanumerical, underscore, and hyphes only';

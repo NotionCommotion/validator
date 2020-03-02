@@ -8,7 +8,7 @@ namespace Greenbean\Validator;
 *
 * All $.validate standard rules and additional-methods.js are supported as is except for:
 *   - serverOnly rules are not provided to the client
-*   - noServer rules are just used by the client
+*   - clientOnly rules are just used by the client
 *   - The "remote" is not directly processed by this class, and it is expected that the developer will direct the call to an endpoint which calls the validateProperty() method.
 *   - accept and extention is not complete.
 *
@@ -136,11 +136,11 @@ class Validator
         return new self($properties, $this->validatorConfig, $this->throwExeptions);
     }
 
-    static public function create(array $properties, ValidatorConfigInterface $validatorConfig=null, bool $throwExeptions=true) {
+    static public function create(array $properties, ValidatorConfigInterface $validatorConfig=null, bool $throwExeptions=true):self {
         return new self($properties, $validatorConfig, $throwExeptions);
     }
 
-    static public function filesToArr($files) {
+    static public function filesToArr($files):array {
         $files=(array)$files;
         $options=[];
         foreach($files as $file) {
@@ -152,12 +152,13 @@ class Validator
         return count($options)>1?array_replace_recursive(...$options):$options[0];
     }
 
-    public function addAdditionalRulesFromFiles($files) {
+    public function addAdditionalRulesFromFiles($files):self {
         $rules=$this->filesToArr($files);
         $this->properties=array_merge($this->properties, $rules);
+        return $this;
     }
 
-    public function getSubProperties(string $subpath, array $properties=[]) {
+    public function getSubProperties(string $subpath, array $properties=[]):array {
         $properties=$properties?array_replace_recursive($this->properties, $properties):$this->properties;
         $subpath=explode('.', $subpath);
         foreach($subpath as $key) {
@@ -169,7 +170,7 @@ class Validator
         return $properties;    //Let caller deal with it should an array be returned.
     }
 
-    private function setProperties(array $properties) {
+    private function setProperties(array $properties):void {
         if($properties && $this->isSequentialArray($properties)) {
             if(!in_array(count($properties),[1,2,3])) {
                 throw new ValidatorErrorException('Sequencial array validation must have only one value plus an optional minimum and maximum count value');
@@ -184,8 +185,9 @@ class Validator
         }
     }
 
-    public function replaceProperties(array $properties) {
+    public function replaceProperties(array $properties):self {
         $this->setProperties($properties);
+        return $this;
     }
 
     public function getJSON(array $properties=[], string $subpath=null, bool $asJson=false) {
@@ -205,15 +207,24 @@ class Validator
         $properties=$subpath?$this->getSubProperties($subpath, $properties)
         :($properties?array_replace_recursive($this->properties, $properties):$this->properties);
 
+        $rsp=[];
         foreach($properties as $name=>$options) {
-            if(isset($options['rules']) && !(isset($options['rules'][0]) && $options['rules'][0]==='serverOnly')) {
-                $rules[$name]=$options['rules'];
+            if(isset($options['extend'])) {
+                $validator = self::create($options['extend'], $this->validatorConfig, $this->throwExeptions);
+                $rsp[$name]=is_array($options['extend'])?[$validator->getJSON()]:$validator->getJSON();
             }
-            if(isset($options['message'])) {
-                $messages[$name]=$options['message'];
+            else {
+                if(isset($options['rules'])) {
+                    if(is_array($options['rules'])) {
+                        unset($options['rules']['serverOnly']);
+                    }
+                    $rules[$name]=$options['rules'];
+                }
+                if(isset($options['message'])) {
+                    $messages[$name]=$options['message'];
+                }
             }
         }
-        $rsp=[];
         if($rules) $rsp['rules']=$rules;
         if($messages) $rsp['messages']=$messages;
         return $asJson?json_encode($rsp):$rsp;
@@ -329,11 +340,13 @@ class Validator
                 else {
                     //One or more compound rules
                     foreach ($item['rules'] AS $method=>$param) {
-                        if($method==='serverOnly') {
-                            $this->validateValue($errors, $param, $name, $value, true, $data);
-                        }
-                        else {
-                            $this->validateValue($errors, $method, $name, $value, $param, $data);
+                        if($method!=='clientOnly') {
+                            if($method==='serverOnly') {
+                                $this->validateValue($errors, $param, $name, $value, true, $data);
+                            }
+                            else {
+                                $this->validateValue($errors, $method, $name, $value, $param, $data);
+                            }
                         }
                     }
                 }

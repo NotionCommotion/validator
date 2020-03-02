@@ -26,7 +26,7 @@ class Sanitizers {
         return (int)$value;
     }
     public function bool($value){
-        return boolval($value);
+        return $value=='false'?false:boolval($value);
     }
     public function boolInt($value){
         //Instead of true/false, returns 1/2
@@ -85,7 +85,7 @@ class Sanitizers {
         return ($val=str_replace('.','',$value))?$val:null;
     }
     public function numbersOnly($value){
-        return is_numeric($value)?$value:null;
+        return is_numeric($value)?(float)$value:null;
         //return (($valuex=preg_replace("/\D/","",$value))?$valuex:null);
     }
     public function USstate($value){
@@ -168,7 +168,7 @@ class Sanitizers {
         else return null;
     }
     public function numbersOnlyNull($value){
-        return ($value=preg_replace("/\D/","",$value))?$value:null;
+        return ($value=preg_replace("/\D/","",$value))?(float)$value:null;
     }
     public function arrayIntNotZero($value){
         $value=(array)$value;
