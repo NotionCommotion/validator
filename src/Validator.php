@@ -33,6 +33,8 @@ namespace Greenbean\Validator;
 * Sanitizers are described in a simalar format, and are used server-side only.  Similar to rules, they can be defined as simple or complex.
 * Standard supported sanitizers are specified under $this->sanitizers.
 *
+* notes can be inserted in the top array and are ignored.
+* 
 * Unlike jQuery.Validator, config JSON first specifies each property name and then lists the following:
 * - rules.  Follows jQuery.Validator format.
 * - messages.  Follows jQuery.Validator format.
@@ -48,6 +50,7 @@ namespace Greenbean\Validator;
 * {
 * "someProperty": {
 * //Rules can be a string
+* "notes": "bla bla bla",
 * "rules": "singleRule",
 * //or a sequential array
 * "rules": [
@@ -209,6 +212,7 @@ class Validator
 
         $rsp=[];
         foreach($properties as $name=>$options) {
+            unset($options['notes']);
             if(isset($options['extend'])) {
                 $validator = self::create($options['extend'], $this->validatorConfig, $this->throwExeptions);
                 $rsp[$name]=is_array($options['extend'])?[$validator->getJSON()]:$validator->getJSON();
@@ -217,6 +221,9 @@ class Validator
                 if(isset($options['rules'])) {
                     if(is_array($options['rules'])) {
                         unset($options['rules']['serverOnly']);
+                    }
+                    if(isset($options['rules']['clientOnly'])) {
+                        $options['rules']=$options['rules']['clientOnly'];
                     }
                     $rules[$name]=$options['rules'];
                 }
