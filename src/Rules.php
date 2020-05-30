@@ -45,11 +45,11 @@ class Rules {
         return $value % $step?"$name is not a step of $step":false;
     }
     public function email($value, $prop, $name){
-        //return (!$prop || !trim($value) || preg_match('/^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$/i', $value) )?false:'Invalid email';
-        return (!$prop || !trim($value) || filter_var($value, FILTER_VALIDATE_EMAIL) )?false:'Invalid email';
+        //return (!$prop || empty($value) || preg_match('/^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$/i', $value) )?false:'Invalid email';
+        return (!$prop || empty($value) || filter_var($value, FILTER_VALIDATE_EMAIL) )?false:'Invalid email';
     }
     public function url($value, $prop, $name){
-        return (!$prop || !trim($value) || filter_var($value, FILTER_VALIDATE_URL) )?false:'Invalid URL';
+        return (!$prop || empty($value) || filter_var($value, FILTER_VALIDATE_URL) )?false:'Invalid URL';
     }
     public function date($value, $prop, $name){
         if (!$prop || (!is_null($value) && trim($value)!='')) return false;
@@ -65,10 +65,10 @@ class Rules {
         ?false:$name.' is not a ISO date';
     }
     public function number($value, $prop, $name){
-        return (!$prop || !trim($value) || is_numeric($value))?false:"$name is not a number";
+        return (!$prop || empty($value) || is_numeric($value))?false:"$name is not a number";
     }
     public function digits($value, $prop, $name){
-        return (!$prop || !trim($value) || ctype_digit($value) || $value===(int)$value)?false:"$name is not a digit";
+        return (!$prop || empty($value) || ctype_digit($value) || $value===(int)$value)?false:"$name is not a digit";
     }
 
     public function equalTo($value, $value2, $name){
@@ -91,14 +91,15 @@ class Rules {
         return 'extension validation is not yet complete.';
     }
     public function phoneUS($value, $prop, $name){
-        //return (!$prop || !trim($value) || preg_match("/^([1]-)?[0-9]{3}-[0-9]{3}-[0-9]{4}$/i",$value))?false:'Invalid phone number';
+        //return (!$prop || empty($value) || preg_match("/^([1]-)?[0-9]{3}-[0-9]{3}-[0-9]{4}$/i",$value))?false:'Invalid phone number';
         //Only works if first sanitized with phoneUS
-        return (!$prop || !trim($value) || strlen((int)$value)==10)?false:'Invalid phone number';
+        return (!$prop || empty($value) || strlen((int)$value)==10)?false:'Invalid phone number';
     }
     public function require_from_group($value, $prop, $name){
         //Return true if value provided for one of the given names which has the same ID
         //Supports by ID using "#seriesName, #seriesId" and by name using "[name=categoriesName],[name=categoriesId]" only
         //syslog(LOG_INFO,"require_from_group $value ".json_encode($prop)." $name");
+        if(is_null($value)) return false;
         $selections=explode(',',str_replace(' ', '', $prop[1]));
         $names=[];
         $count=0;
@@ -116,48 +117,48 @@ class Rules {
     //Custom rules
 
     public function string($value, $prop, $name){
-        return (!$prop || !trim($value) || is_string($value))?false:"$name is not a string";
+        return (!$prop || empty($value) || is_string($value))?false:"$name is not a string";
     }
     public function bool($value, $prop, $name){
-        return (!$prop || is_bool($value))?false:"$name is not boolean";
+        return (!$prop || is_null($value) || is_bool($value))?false:"$name is not boolean";
     }
     public function boolInt($value, $prop, $name){
-        return (!$prop || is_bool($value) || $value===0 || $value===1)?false:"$name is not boolean";
+        return (!$prop || is_null($value) || is_bool($value) || $value===0 || $value===1)?false:"$name is not boolean";
     }
     public function exactlength($value, $prop, $name){
-        return (strlen(trim($value))!=$prop)?"$name requires exactly $prop characters":false;
+        return (is_null($value) || strlen(trim($value))===$prop)?false:"$name requires exactly $prop characters";
     }
     public function guid($value, $prop, $name){
-        return (!$prop || !trim($value) || preg_match("/^(\{)?[a-f\d]{8}(-[a-f\d]{4}){4}[a-f\d]{8}(?(1)\})$/",$value))?false:'Invalid GUID format';
+        return (!$prop || empty($value) || preg_match("/^(\{)?[a-f\d]{8}(-[a-f\d]{4}){4}[a-f\d]{8}(?(1)\})$/",$value))?false:'Invalid GUID format';
     }
     public function longitude($value, $prop, $name){
-        return (!$prop || !trim($value) || ($value<=180))?false:'Invalid longitude';
+        return (!$prop || empty($value) || ($value<=180))?false:'Invalid longitude';
     }
     public function latitude($value, $prop, $name){
-        return (!$prop || !trim($value) || ($value<=90))?false:'Invalid latitude';
+        return (!$prop || empty($value) || ($value<=90))?false:'Invalid latitude';
     }
     public function loginRegex($value, $prop, $name){
-        return (!$prop || !trim($value) || preg_match("/^[a-z0-9._]+$/i",$value))?false:'Username must contain only letters, numbers, underscore, or period';
+        return (!$prop || empty($value) || preg_match("/^[a-z0-9._]+$/i",$value))?false:'Username must contain only letters, numbers, underscore, or period';
     }
     public function noInvalid($value, $prop, $name){
-        return (!$prop || !trim($value) || preg_match("/^[a-z0-9.,-_!()& ]+$/i",$value))?false:'Invalid characters';
+        return (!$prop || empty($value) || preg_match("/^[a-z0-9.,-_!()& ]+$/i",$value))?false:'Invalid characters';
     }
     public function domain($value, $prop, $name){
-        return (!$prop || !trim($value) || preg_match("/^[a-z0-9_-]+$/i",$value))?false:'Alphanumerical, underscore, and hyphes only';
+        return (!$prop || empty($value) || preg_match("/^[a-z0-9_-]+$/i",$value))?false:'Alphanumerical, underscore, and hyphes only';
     }
     public function filename($value, $prop, $name){
-        return (!$prop || !trim($value) || (strpbrk($value, "\\/%*:|\"<>") === FALSE))?false:'Invalid file name';
+        return (!$prop || empty($value) || (strpbrk($value, "\\/%*:|\"<>") === FALSE))?false:'Invalid file name';
     }
     public function validIP($value, $prop, $name){
-        return (!$prop || !trim($value) || filter_var($pi->$property, FILTER_VALIDATE_IP))?false:'IP Addresses must have format xxx.xxx.xxx.xxx';
+        return (!$prop || empty($value) || filter_var($pi->$property, FILTER_VALIDATE_IP))?false:'IP Addresses must have format xxx.xxx.xxx.xxx';
     }
     public function isUSstate($value, $prop, $name){
         $states=['AA'=>1,'AE'=>1,'AL'=>1,'AK'=>1,'AS'=>1,'AP'=>1,'AZ'=>1,'AR'=>1,'CA'=>1,'CO'=>1,'CT'=>1,'DE'=>1,'DC'=>1,'FM'=>1,'FL'=>1,'GA'=>1,'GU'=>1,'HI'=>1,'ID'=>1,'IL'=>1,'IN'=>1,'IA'=>1,'KS'=>1,'KY'=>1,'LA'=>1,'ME'=>1,'MH'=>1,'MD'=>1,'MA'=>1,'MI'=>1,'MN'=>1,'MS'=>1,'MO'=>1,'MT'=>1,'NE'=>1,'NV'=>1,'NH'=>1,'NJ'=>1,'NM'=>1,'NY'=>1,'NC'=>1,'ND'=>1,'MP'=>1,'OH'=>1,'OK'=>1,'OR'=>1,'PW'=>1,'PA'=>1,'PR'=>1,'RI'=>1,'SC'=>1,'SD'=>1,'TN'=>1,'TX'=>1,'UT'=>1,'VT'=>1,'VI'=>1,'VA'=>1,'WA'=>1,'WV'=>1,'WI'=>1,'WY'=>1];
-        return (!$prop || !trim($value) || isset($states[$value]))?false:'Must be a US State';
+        return (!$prop || empty($value) || isset($states[$value]))?false:'Must be a US State';
     }
     public function timezone($value, $prop, $name){
         //both timezone and timezoneId do the same thing. timezone is probably better.
-        if(!$prop || !trim($value)) return false;
+        if(!$prop || empty($value)) return false;
         try{
             new \DateTimeZone($value);
         }catch(\Exception $e){
@@ -166,7 +167,7 @@ class Rules {
         return FALSE;
     }
     public function timezoneId($value, $prop, $name){
-        return (!$prop || !trim($value) || (in_array($value, DateTimeZone::listIdentifiers())))?false:"Invalid timezone '$value'";
+        return (!$prop || empty($value) || (in_array($value, DateTimeZone::listIdentifiers())))?false:"Invalid timezone '$value'";
     }
     public function validIPList($value, $prop, $name){
         $valid=true;
@@ -179,18 +180,25 @@ class Rules {
         return ($valid)?false:'IP Addresses must have format xxx.xxx.xxx.xxx';
     }
     public function inArray($value, $prop, $name){
-        return (!$value || in_array($value, $prop))?false:"$name must be one of: ".implode(', ',$prop);
+        if(is_array($value)) {
+            return ($err=array_diff($value, $prop))?$name.' with values ['.implode(', ',$value).'] are limited to: '.implode(', ',$prop):false;
+
+        }
+        else {
+            return (is_null($value) || in_array($value, $prop))?false:"$name with value $value must be one of: ".implode(', ',$prop);
+        }
     }
     public function isObject($value, $prop, $name){
-        return (!$prop || is_object($value))?false:"$name is not an object";
+        return (!$prop || is_null($value) || is_object($value))?false:"$name is not an object";
     }
     public function isArray($value, $prop, $name){
-        return (!$prop || is_array($value))?false:"$name is not an array";
+        return (!$prop || is_null($value) || is_array($value))?false:"$name is not an array";
     }
     public function isSequntialArray($value, $prop, $name){
-        return (!$prop || (is_array($value) && array_values($value) === $value))?false:"$name is not a sequential array";
+        return (!$prop || is_null($value) || (is_array($value) && array_values($value) === $value))?false:"$name is not a sequential array";
     }
     public function isSequntialIntArray($value, $prop, $name){
+        if(is_null($value)) return false;
         if($error=$this->isSequntialArray($value, $prop, $name)) {
             return $error;
         }
@@ -202,6 +210,7 @@ class Rules {
         return false;
     }
     public function isSequntialDigitArray($value, $prop, $name){
+        if(is_null($value)) return false;
         if($error=$this->isSequntialArray($value, $prop, $name)) {
             return $error;
         }

@@ -22,8 +22,9 @@ class Sanitizers {
     public function string($value){
         return (string)$value;
     }
-    public function int($value){
-        return (int)$value;
+    public function int($value):?int{
+        //Consider making other sanitizer methods return null if not even close.
+        return ctype_digit($value)||is_int($value)?(int)$value:null;
     }
     public function bool($value){
         return $value=='false'?false:boolval($value);
@@ -31,6 +32,9 @@ class Sanitizers {
     public function boolInt($value){
         //Instead of true/false, returns 1/2
         return $value?1:0;
+    }
+    public function positiveNegative($value){
+        return (int)$value>0;
     }
     public function yes_no($value){
         return $value=='y'?1:0;
@@ -41,6 +45,7 @@ class Sanitizers {
     public function intNULL($value){
         return (int)$value?$value:null;
     }
+    //Don't use array() and object()
     public function array($value){
         return (array)$value;
     }
