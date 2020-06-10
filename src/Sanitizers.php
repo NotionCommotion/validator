@@ -89,10 +89,6 @@ class Sanitizers {
         $this->verifyAString($value);
         return ($val=str_replace('.','',$value))?$val:null;
     }
-    public function numbersOnly($value){
-        return is_numeric($value)?(float)$value:null;
-        //return (($valuex=preg_replace("/\D/","",$value))?$valuex:null);
-    }
     public function USstate($value){
         $this->verifyAString($value);
         $value = strtoupper(preg_replace('/[^a-z]+/i', '', trim($value)));
@@ -122,8 +118,11 @@ class Sanitizers {
     }
     public function float($value, $digits){
         //Return a decimal of given number of characters
-        $value=number_format($value?$value:null,$digits,'.','');
-        return is_numeric($value)?$value:null;
+        if(!is_null($digits)) {
+            $value=number_format($value?$value:null,$digits,'.','');
+        }
+        //return (($value=preg_replace("/\D/","",$value))?$value:null);
+        return is_numeric($value)?(float)$value:null;
     }
     public function percent($value){
         $value=rtrim($value,'%');   //I don't know why the percent is being sent to the server, but not dollar for other types?  Has to do with maskinput plugin
@@ -171,9 +170,6 @@ class Sanitizers {
             return ($datetime->format( 'H')==0 && $datetime->format( 'i')==0)?$datetime->format('m/d/Y'):$datetime->format('m/d/Y H:i');
         }
         else return null;
-    }
-    public function numbersOnlyNull($value){
-        return ($value=preg_replace("/\D/","",$value))?(float)$value:null;
     }
     public function arrayIntNotZero($value){
         $value=(array)$value;

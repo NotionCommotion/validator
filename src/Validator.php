@@ -113,10 +113,16 @@ class Validator
     $maximumArrayCount,             //If set, will require extended arrays to have at most that given count.
     $customRules=[],                //Internal.  array of custom rules supported by ValidatorConfig
     $customSanitizers=[],           //Internal.  array of custom sanitizers supported by ValidatorConfig
-    $rules, $sanitizers;            //Internal.  standard rules and sanitizers
+    $rules, $sanitizers,            //Internal.  standard rules and sanitizers
+    $abstract=[];
 
     public function __construct(array $properties, ValidatorConfigInterface $validatorConfig=null, bool $throwExeptions=true) {
 
+        if(!empty($properties['abstract'])) {
+            $this->abstract=array_replace_recursive($this->abstract, $properties['abstract']);
+        }
+        unset($properties['abstract']);
+        $properties=array_filter($properties);
         $this->setProperties($properties);
 
         if($validatorConfig) {
@@ -131,13 +137,10 @@ class Validator
     }
 
     public function getExtendedValidator(string $extend, bool $validateArray=false):self {
-        if(!isset($this->properties[$extend]['extend'])) {
-            throw new ValidatorErrorException("Validation not configured for $extend");
-        }
-        $properties=$this->properties[$extend]['extend'];
-        if(!$validateArray && $this->isSequentialArray($properties)) {
-            $properties=$properties[0];
-        }
+        $properties = $this->isSequentialArray($this->properties[$extend]['extend'])
+        ?$this->properties[$extend]['extend'][0]
+        :$this->properties[$extend]['extend'];
+        $properties['abstract']=$this->abstract;
         return new self($properties, $this->validatorConfig, $this->throwExeptions);
     }
 
@@ -186,15 +189,6 @@ class Validator
             $this->maximumArrayCount=$properties[2]??null;
         }
         else {
-            foreach($properties as $name=>$options) {
-                if(is_string($options)) {
-                    if(!isset($properties['abstract'][$options])) {
-                        throw new ValidatorErrorException("Missing abstract property $options");
-                    }
-                    $properties[$name] = $properties['abstract'][$options];
-                }
-            }
-            unset($properties['abstract']);
             $this->properties=$properties;
         }
     }
@@ -233,8 +227,14 @@ class Validator
             if($name!=='abstract') {
                 unset($options['notes']);
                 if(isset($options['extend'])) {
+                    if($isSequencial = $this->isSequentialArray($options['extend'])) {
+                        $options['extend'][0]['abstract']=$properties['abstract']??[];
+                    }
+                    else {
+                        $options['extend']['abstract']=$properties['abstract']??[];
+                    }
                     $validator = self::create($options['extend'], $this->validatorConfig, $this->throwExeptions);
-                    $rsp[$name]=is_array($options['extend'])?[$validator->getJSON()]:$validator->getJSON();
+                    $rsp[$name]=$isSequencial?[$validator->getJSON()]:$validator->getJSON();
                 }
                 else {
                     if(isset($options['rules'])) {
@@ -298,7 +298,7 @@ class Validator
         $errors=[];
 
         if($this->sequencialArray) {
-            if(is_array($data)) {
+            if($this->isSequentialArray($data)) {
                 if($this->minimumArrayCount && count($data)<$this->minimumArrayCount) {
                     $errors[]="Data array must have at least $this->minimumArrayCount rows.";
                 }
@@ -329,7 +329,7 @@ class Validator
 
     private function _sanitize(array $properties, array $data, bool $includeDefaults=true, array $default=[]):array {
         if($this->sequencialArray) {
-            if(is_array($data)) {
+            if($this->isSequentialArray($data)) {
                 foreach($data as &$row) {
                     $row=$this->sanitizeRow($properties, $row, $includeDefaults, $default);
                 }
@@ -348,6 +348,12 @@ class Validator
         foreach($properties as $name=>$item) {
             if(!isset($data[$name]) && $ignoreRequired) {
                 continue;
+            }
+            if(is_string($item)){
+                if(!isset($this->abstract[$item])) {
+                    throw new ValidatorErrorException("Missing abstract property $item");
+                }
+                $item = $this->abstract[$item];
             }
             $value=$data[$name]??$item['default']??null;
             if(!empty($item['rules'])) {
@@ -395,41 +401,38 @@ class Validator
         //Only include parameters which have either a sanitizer or default value.
         $sanitized=[];
         foreach($properties as $name=>$item) {
+            if(is_string($item)){
+                if(!isset($this->abstract[$item])) {
+                    throw new ValidatorErrorException("Missing abstract property $item");
+                }
+                $item = $this->abstract[$item];
+            }
             $defaultValue=$default[$name]['default']??$item['default']??null;
             if(!isset($data[$name]) && !is_null($defaultValue)) {
                 if($includeDefaults) $sanitized[$name]=$defaultValue;
             }
-            elseif(isset($data[$name]) && isset($item['sanitizers'])){
+            elseif(isset($item['sanitizers'])){
                 if(is_string($item['sanitizers'])) {
-                    $value=$this->sanitizeValue($item['sanitizers'], $name, $data[$name], null);
-                    if(!is_null($value)) {
-                        $sanitized[$name]=$value;
-                    }
+                    $sanitized[$name]=$this->sanitizeValue($item['sanitizers'], $name, $data[$name]??$defaultValue, null);
                 }
                 elseif($this->isSequentialArray($item['sanitizers'])) {
                     //Multiple santitizers
                     foreach ($item['sanitizers'] AS $method) {
-                        $value=is_string($method)
+                        $sanitized[$name]=is_string($method)
                         ?$this->sanitizeValue($method, $name, $sanitized[$name], null)
                         :$this->sanitizeValue(key($method), $name, $sanitized[$name], reset($method));
-                        if(!is_null($value)) {
-                            $sanitized[$name]=$value;
-                        }
                     }
                 }
                 else {
                     //Multiple compound santitizers
                     foreach ($item['sanitizers'] AS $method=>$param) {
-                        $value=$this->sanitizeValue($method, $name, $sanitized[$name], $param);
-                        if(!is_null($value)) {
-                            $sanitized[$name]=$value;
-                        }
+                        $sanitized[$name]=$this->sanitizeValue($method, $name, $sanitized[$name], $param);
                     }
                 }
             }
-            elseif(isset($item['rules'])) {
+            elseif(isset($data[$name]) && isset($item['rules'])) {
                 //No sanitizer but a rule exists so keep it in its current state
-                $sanitized[$name]=$data[$name]??null;
+                $sanitized[$name]=$data[$name];
             }
             if(isset($sanitized[$name]) && !empty($item['extend'])){
                 if(!$item['extend'] instanceof Validator) {
