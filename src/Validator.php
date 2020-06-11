@@ -118,10 +118,10 @@ class Validator
 
     public function __construct(array $properties, ValidatorConfigInterface $validatorConfig=null, bool $throwExeptions=true) {
 
-        if(!empty($properties['abstract'])) {
+        if(isset($properties['abstract'])) {
             $this->abstract=array_replace_recursive($this->abstract, $properties['abstract']);
+            unset($properties['abstract']);
         }
-        unset($properties['abstract']);
         $properties=array_filter($properties);
         $this->setProperties($properties);
 

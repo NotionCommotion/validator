@@ -116,7 +116,7 @@ class Sanitizers {
         $value=$value?number_format(ltrim($value,'$'),2,'.',''):null;
         return is_numeric($value)?$value:null;
     }
-    public function float($value, $digits){
+    public function number($value, $digits){
         //Return a decimal of given number of characters
         if(!is_null($digits)) {
             $value=number_format($value?$value:null,$digits,'.','');
