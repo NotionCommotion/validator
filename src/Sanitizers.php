@@ -27,11 +27,11 @@ class Sanitizers {
         return ctype_digit($value)||is_int($value)?(int)$value:null;
     }
     public function bool($value){
-        return $value=='false'?false:boolval($value);
+        return is_string($value) ? filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) : boolval($value);
     }
     public function boolInt($value){
         //Instead of true/false, returns 1/2
-        return $value?1:0;
+        return $this->bool($value)?1:0;
     }
     public function positiveNegative($value){
         return (int)$value>0;
